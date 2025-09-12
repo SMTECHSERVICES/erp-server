@@ -20,7 +20,6 @@ export const verifyOtpLoginSchema = z.object({
 
 export const employeeRegistrationSchema = z.object({
   name: z.string().min(1),
-  email: z.email(),
   phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits"),  // ✅ improved validation
   role: z.enum(['SUPERVISOR', 'WORKER']), // 🔍 Better to use enums to avoid typos
   password: z.string().min(6)
@@ -30,4 +29,19 @@ export const employeeRegistrationSchema = z.object({
 export const employeeLoginSchema = z.object({
   phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits"),  // ✅ improved validation
   password: z.string().min(6)
+});
+
+export const partNoZodSchema = z.object({
+  partNo: z.string().min(1, "Part number is required"),       // required string
+ od: z.number({ required_error: "OD is required" }),     // required number
+  id: z.number({ required_error: "ID is required" }),     // required number                   
+  length: z.number().optional(),                              // optional string
+  cncSetupRequired: z.number().default(0),                    // number with default
+   cycleTime: z
+    .string()
+    .regex(
+      /^([0-1]?\d|2[0-3]):([0-5]?\d):([0-5]?\d)$/,
+      "Cycle time must be in HH:MM:SS format"
+    )
+    .optional(), // ✅ accepts values like "01:23:45"
 });

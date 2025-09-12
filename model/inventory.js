@@ -1,23 +1,28 @@
 import mongoose from "mongoose";
+import { string } from "zod";
 
 // models/InventoryItem.js
 const inventoryItemSchema = new mongoose.Schema({
-  productId: { type: String, required: true, unique: true }, // 👈 Manual ID from client
-  name: { type: String, required: true },                    // 👈 Human-readable name
-  category: { type: String },                                // 👈 Raw Material, Finished Good, etc.
-  //location: { type: String },                                // 👈 Where it's stored
-  quantity: { type: Number, default: 0 },                    // 👈 Current stock
-  unit: { type: String, default: 'pcs' },                    // 👈 Units (e.g. meters, pcs)
-  minStock: { type: Number, default: 50 },                    // 👈 Alert if quantity < this
-  stockMovements: [                                          // 👇 Tracks every change in quantity
+  partNo: { type: mongoose.Schema.Types.ObjectId, ref:"PartNo" }, 
+  partNoName:{type:String},
+ 
+    quantities: [
     {
-      type: { type: String, enum: ['IN', 'OUT'], required: true },
-      quantity: { type: Number, required: true },
-      reason: { type: String },
-      user: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
-      date: { type: Date, default: Date.now }
-    }
-  ]
+      type: { type: String, required: true }, // e.g. "raw", "finished", "cnc1"
+      quantity: { type: Number, default: 0 },
+      unit: { type: String, default: "pcs" }, // e.g. "pcs", "kg", "litre"
+    },
+  ], 
+  totalStockInHand:{type:Number,default:0} ,      
+  // stockMovements: [                                          
+  //   {
+  //     type: { type: String, enum: ['IN', 'OUT'], required: true },
+  //     quantity: { type: Number, required: true },
+  //     reason: { type: String },
+  //     user: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
+  //     date: { type: Date, default: Date.now }
+  //   }
+  // ]
 }, { timestamps: true });
 
 

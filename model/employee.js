@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 
 const EmployeeSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String, unique: true, sparse: true,required:true },
   phone: { type: String,required:true },
   role: {
     type: String,
@@ -12,11 +11,11 @@ const EmployeeSchema = new mongoose.Schema({
     default: 'WORKER'
   },
   password: { type: String,required:true }, // hashed password
-  // photoUrl: { type: String,required:true },
-  // photoUrlPublicId: {
-  //   type:String,
-  //   select:false
-  // },
+  photoUrl: { type: String,required:true },
+  photoUrlPublicId: {
+    type:String,
+    select:false
+  },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

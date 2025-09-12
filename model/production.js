@@ -1,15 +1,14 @@
 import mongoose from "mongoose";
-import { string } from "zod";
+import { date, string } from "zod";
 
 // models/ProductionOrder.js
 const productionOrderSchema = new mongoose.Schema({
-  item: { type: mongoose.Schema.Types.ObjectId, ref: "Inventory", required: true }, // 👈 Link to InventoryItem
-  productId: { type: String, required: true },
+  partNo: { type: mongoose.Schema.Types.ObjectId, ref: "Inventory", required: true }, // 👈 Link to InventoryItem
+  date:{type:Date},
   rawMaterialFromInventory:{type:Number,required:true},
-  batchId: { type: String, required: true,index:true},
   reason:{type:String,required:true},                              // 👈 Production batch number
   initialPlannedQty: { type: Number, required: true },                                  // 👈 How much was intended to be produced
-  finalOutputQty: { type: Number },
+  finishedProduct: { type: Number },
   totalLoss:{type:Number},                                                     // 👈 How much was finally created
   status:{type:String,enum: ['INPROGRESS', 'COMPLETED'],required:true},              
   stages: [                                                                             // 👇 Track each production stage

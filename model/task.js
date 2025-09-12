@@ -1,15 +1,22 @@
 // models/Task.js
 import mongoose from "mongoose";
-import { string } from "zod";
+
 
 const taskSchema = new mongoose.Schema({
-  title: { type: String, required: true },
+  partNo:{type:mongoose.Types.ObjectId,ref:"PartNo", required: true },
+  machineName:{type:String},
+  machineNumber:{type:Number,default:0},
+  // machineNumber:{type:String},
   description: { type: String },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
   assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
-    batchId: { type: String, required: true, },                              
+  completionQuantity:{type:Number},
+  // employeeWork:{type:Number},
+  target:{type:Number},
+
   // location: { type: String }, // optional
-  dueDate: { type: Date },
+  date: { type: Date },
+  shift:{type:String,enum:["Day","Night"]},
   status: {
     type: String,
     enum: [ 'IN_PROGRESS', 'COMPLETED'],

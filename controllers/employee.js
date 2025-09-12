@@ -87,7 +87,7 @@ export const markInTime = async(req,res,next)=>{
     const distance = calculateDistance(inLocation.lat,inLocation.lng,officeLat,officeLong);
     // console.log(distance)
 
-    if(distance >200){
+    if(distance >50){
         return next(
         new ErrorHandler(
           `You are too far from office location. Distance: ${distance.toFixed(
@@ -121,7 +121,7 @@ export const markInTime = async(req,res,next)=>{
     })
 
     } catch (error) {
-        console.log(error);
+        //console.log(error);
         return next(new ErrorHandler("Internal server error",500))
     }
 
@@ -157,21 +157,21 @@ export const markOutTime = async(req,res,next)=>{
       });
     }
 
-    console.log(existing)
-    console.log("hi")
+    //console.log(existing)
+    //console.log("hi")
 
     if(!existing?.inTime){
       return next(new ErrorHandler("Please mark intime first",401))
     }
 
-    console.log("Hello")
+    //console.log("Hello")
     // console.log(outLocation)
     // console.log(officeLat,officeLong)
 
     const distance = calculateDistance(outLocation.lat,outLocation.lng,officeLat,officeLong);
     // console.log(distance)
 
-    if(distance >200){
+    if(distance >50){
         return next(
         new ErrorHandler(
           `You are too far from office location. Distance: ${distance.toFixed(
@@ -323,7 +323,7 @@ export const myAttendance = async (req, res, next) => {
 export const MyTask = async(req,res,next)=>{
   
   try {
-    const myTask = await Task.find({assignedTo:req.user._id,status:"IN_PROGRESS"}).populate({path:'assignedBy',select:"name"});
+    const myTask = await Task.find({assignedTo:req.user._id,status:"IN_PROGRESS"}).populate({path:'partNo',select:"partNo drawingFileUrl od id length"});
 
     return res.status(200).json({
       myTask
@@ -334,3 +334,177 @@ export const MyTask = async(req,res,next)=>{
   }
 }
 
+export const markTaskComplete = async(req,res,next)=>{
+  try {
+    const {taskId} = req.params;
+    const {completionQuantity} = req.body;
+
+    console.log(taskId,completionQuantity)
+
+    if(!taskId || !completionQuantity){
+        return next(new ErrorHandler("Please provide the detail",400))
+    }
+
+    const task = await Task.findById(taskId);
+
+    if(!task || task.status==="COMPLETED"){
+      return next(new ErrorHandler("This task does not exist"))
+    }
+
+    task.completionQuantity=completionQuantity;
+    await task.save();
+
+    return res.status(201).json({
+      message:'Task updated successfully'
+    })
+
+
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+}
+
+export const allMyTasks = async (req, res, next) => {
+  try {
+    const userId = req.user.id; // logged in employee
+    const { date } = req.body; // or req.query depending on frontend
+
+    if (!date) {
+      return next(new ErrorHandler("Please provide a date", 400));
+    }
+
+    // Normalize date: from start of the day to end of the day
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const tasks = await Task.find({
+      assignedTo: userId,
+      date: { $gte: start, $lte: end }
+    })
+      .populate("partNo", "partNo partName material")
+      .populate("assignedBy", "name email")
+      .sort({ date: 1 });
+
+    return res.status(200).json({
+      success: true,
+      count: tasks.length,
+      tasks,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+};
+
+export const myProgressbar = async (req, res, next) => {
+  try {
+    // console.log(req.user._id)
+    const  employeeId  = req.user.id;
+    const { month } = req.query; // optional: month filter
+    console.log(employeeId)
+
+    if (!employeeId) {
+      return next(new ErrorHandler("Please provide Employee Id", 400));
+    }
+
+    const isEmployee = await Employee.findById(employeeId);
+    if (!isEmployee) {
+      return next(new ErrorHandler("This employee does not exist in database", 404));
+    }
+
+    const now = new Date();
+    let startUTC, endUTC;
+
+    if (month) {
+      const parsed = parseMonthString(month);
+      if (!parsed) {
+        return next(new ErrorHandler("Invalid month format. Use YYYY-MM or 'August 2025' or '08-2025'.", 400));
+      }
+      const { year, monthIndex } = parsed;
+      // start = 00:00:00.000 UTC of first day
+      startUTC = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+      // end = last ms of that month in UTC
+      const firstOfNextMonth = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0, 0));
+      endUTC = new Date(firstOfNextMonth.getTime() - 1);
+    } else {
+      // default: last 15 days (including today) using UTC day boundaries
+      const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+      const start = new Date(end);
+      start.setUTCDate(end.getUTCDate() - 14); // 14 days back + today = 15 days
+      start.setUTCHours(0,0,0,0);
+      startUTC = start;
+      endUTC = end;
+    }
+
+    // debug log (remove in production)
+    console.log("employeeProgressBar range:", startUTC.toISOString(), "->", endUTC.toISOString());
+
+    // Find tasks assigned to this employee within the date range
+    const tasks = await Task.find({
+      assignedTo: employeeId,
+      date: { $gte: startUTC, $lte: endUTC },
+    })
+      .sort({ date: 1 })
+      .populate({
+        path: "partNo",
+        select: "partNo partName", // adjust to your PartNo schema fields
+      })
+      .lean();
+
+    // compute totals and per-task percentages
+    let totalAssigned = 0; // sum of targets
+    let totalCompleted = 0; // sum of completionQuantity
+
+    const tasksWithStats = tasks.map((t) => {
+      const target = Number(t.target || 0);
+      const completed = Number(t.completionQuantity || 0);
+
+      totalAssigned += target;
+      totalCompleted += completed;
+
+      const percent = target > 0 ? Number(((completed / target) * 100).toFixed(2)) : null;
+
+      return {
+        _id: t._id,
+        partNo: t.partNo ? { id: t.partNo._id, partNo: t.partNo.partNo, partName: t.partNo.partName } : null,
+        machineName: t.machineName,
+        machineNumber: t.machineNumber,
+        description: t.description,
+        date: t.date,
+        shift: t.shift,
+        status: t.status,
+        target,
+        completionQuantity: completed,
+        percentComplete: percent, // null if target == 0
+      };
+    });
+
+    const overallPercent = totalAssigned > 0 ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2)) : null;
+
+    return res.status(200).json({
+      success: true,
+      employee: {
+        id: isEmployee._id,
+        name: isEmployee.name,
+        role: isEmployee.role,
+      },
+      range: {
+        startDate: startUTC,
+        endDate: endUTC,
+      },
+      totals: {
+        totalAssigned,
+        totalCompleted,
+        overallPercent, // null if no assigned targets
+      },
+      tasks: tasksWithStats,
+      totalTasks: tasksWithStats.length,
+    });
+  } catch (error) {
+    console.error("employeeProgressBar error:", error);
+    return next(error);
+  }
+};
