@@ -32,16 +32,16 @@ export const employeeRegistration = async (req, res, next) => {
 
   //console.log(result.data)
   const { name, phone, role } = req.body;
-  console.log(req.body)
+ // console.log(req.body)
   if(!name || !phone ||!role){
     return next(new ErrorHandler("Please provide all the details"))
   }
-  console.log("hie helloe")
+  //console.log("hie helloe")
 
       if (!req.file) {
       return next(new ErrorHandler("Photo  is required", 400));
     }
-    console.log("whatsup")
+   // console.log("whatsup")
    // console.log(req.file)
       const base64File = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
       "base64"
@@ -64,7 +64,7 @@ export const employeeRegistration = async (req, res, next) => {
       photoUrlPublicId:uploadResult.public_id
     })
 
-    console.log(newEmployee)
+   // console.log(newEmployee)
 
     return res.status(201).json({
       message: 'Employer registration successfull',
