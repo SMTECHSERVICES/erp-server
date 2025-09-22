@@ -15,7 +15,7 @@ import logout from './controllers/logout.js';
 
 const app = express();
 dotenv.config()
-const port = process.env.PORT
+const port = process.env.PORT || 3000
 
 
 const allowedOrigins = [

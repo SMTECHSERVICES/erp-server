@@ -1,10 +1,12 @@
 import mongoose from "mongoose";
 
 
+
 const invoiceSchema = new mongoose.Schema({
-    url:String,
-    publicId:String
-})
+  date: Date,
+  url: String,
+  publicId: String,
+}, { timestamps: true });
 
 const Invoice = mongoose.model("Invoice",invoiceSchema);
 

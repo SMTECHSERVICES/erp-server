@@ -32,13 +32,17 @@ export const employeeRegistration = async (req, res, next) => {
 
   //console.log(result.data)
   const { name, phone, role } = req.body;
+  console.log(req.body)
   if(!name || !phone ||!role){
     return next(new ErrorHandler("Please provide all the details"))
   }
+  console.log("hie helloe")
 
       if (!req.file) {
       return next(new ErrorHandler("Photo  is required", 400));
     }
+    console.log("whatsup")
+   // console.log(req.file)
       const base64File = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
       "base64"
     )}`;
@@ -47,6 +51,7 @@ export const employeeRegistration = async (req, res, next) => {
       folder: "employeePhotos",
     });
   let p = "vr@123"
+  console.log("after p")
 
   try {
     const newEmployee = await Employee.create({
@@ -58,6 +63,8 @@ export const employeeRegistration = async (req, res, next) => {
       photoUrl:uploadResult.secure_url,
       photoUrlPublicId:uploadResult.public_id
     })
+
+    console.log(newEmployee)
 
     return res.status(201).json({
       message: 'Employer registration successfull',
@@ -375,6 +382,7 @@ export const createRawMaterialInventory = async(req,res,next)=>{
 
 export const getRawMaterialInfo = async (req, res, next) => {
   try {
+    //console.log("hie helloo ")
     const { type, page = 1, limit = 10, startDate, endDate } = req.query;
 
     // Validate type if passed

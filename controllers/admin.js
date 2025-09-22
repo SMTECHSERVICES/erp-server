@@ -54,11 +54,9 @@ export const sendOTP = async (req, res,next) => {
 
 
 export const verifyOtpRegister =  async (req, res,next) => {
-  const result  = verifyOtpRegisterSchema.safeParse(req.body)
-   if(!result.success){
-    return next(new ErrorHandler(result.error.issues[0].message,400))
-   }
+
   const { email, otp,fullName } = req.body;
+  //console.log(req.body)
 
   try {
    
