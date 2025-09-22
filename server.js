@@ -20,6 +20,7 @@ const port = process.env.PORT || 3000
 
 const allowedOrigins = [
   'http://localhost:5173',
+  "https://erp-frontend-two-pink.vercel.app",
   'http://localhost:4173',
   process.env.CLIENT_URL?.trim(),  // Handle potential whitespace
   process.env.ADMIN_URL?.trim()
