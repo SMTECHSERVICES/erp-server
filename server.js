@@ -93,6 +93,10 @@ app.get("/api/me", async (req, res, next) => {
   }
 });
 
+app.get("/mock",(req,res)=>{
+  res.send('hello');
+})
+
 
 
 app.use(ErrorHandlerMiddleware)
