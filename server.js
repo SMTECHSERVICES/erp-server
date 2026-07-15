@@ -20,6 +20,7 @@ const port = process.env.PORT || 3000
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5174',
   "https://erp-frontend-two-pink.vercel.app",
   'http://localhost:4173',
   process.env.CLIENT_URL?.trim(),  // Handle potential whitespace
@@ -66,9 +67,9 @@ app.get("/api/me", async (req, res, next) => {
     const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
 
     let user;
-    if (decoded.role === "admin") {
+    if (decoded.role === "admin" || decoded.role === "ADMIN") {
       user = await Admin.findById(decoded.id).select("name email role");
-    } else if (decoded.role === "WORKER" || "SUPERVISOR") {
+    } else if (decoded.role === "WORKER" || decoded.role === "SUPERVISOR") {
       user = await Employee.findById(decoded.id).select("name email role");
     } else {
       return next(new ErrorHandler("Invalid user role", 403));

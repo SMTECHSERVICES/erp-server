@@ -28,11 +28,11 @@ export const supervisorAndAdminMiddleware = async(req,res,next)=>{
         }
         req.user = isEmployee;
        return next()
-        } else if(decodedData.role==="admin"){
+        } else if (decodedData.role === 'admin' || decodedData.role === 'ADMIN') {
             const isAdmin = await Admin.findById(decodedData.id);
             console.log(isAdmin)
-            if(!isAdmin){
-                 return next(new ErrorHandler("You are authorize to visit this route",401))
+            if (!isAdmin) {
+                return next(new ErrorHandler("You are not authorized to visit this route", 401))
             }
 
             req.user = isAdmin;

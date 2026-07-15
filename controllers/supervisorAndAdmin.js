@@ -23,101 +23,89 @@ import { ta } from "zod/v4/locales";
 import { calcGrossWeight } from "../utils/calcGrossWeight.js";
 import RawMaterial from "../model/rawMaterial.js";
 import {calculatePcs} from "../utils/calculatePcs.js";
+import { parseMonthString } from "../utils/parseMonthString.js";
+import Purchase from "../model/purchase.js";
+import MaterialIssue from "../model/materialIssue.js";
+import MachineProduction from "../model/machineProduction.js";
+import QualityInspection from "../model/qualityInspection.js";
+import FinishedGoods from "../model/finishedGoods.js";
+import SalesOrder from "../model/salesOrder.js";
+import StockReservation from "../model/stockReservation.js";
+import DispatchPlanning from "../model/dispatchPlanning.js";
+import Packing from "../model/packing.js";
+import Dispatch from "../model/dispatch.js";
+import Payment from "../model/payment.js";
 
 export const employeeRegistration = async (req, res, next) => {
-  // const result = employeeRegistrationSchema.safeParse(req.body);
-  // if (!result.success) {
-  //   return next(new ErrorHandler(result.error.issues[0].message, 400))
-  // }
+  const { name, phone, role, password } = req.body;
 
-  //console.log(result.data)
-  const { name, phone, role } = req.body;
- // console.log(req.body)
-  if(!name || !phone ||!role){
-    return next(new ErrorHandler("Please provide all the details"))
+  if (!name || !phone || !role) {
+    return next(new ErrorHandler("Please provide all the details", 400));
   }
-  //console.log("hie helloe")
 
-      if (!req.file) {
-      return next(new ErrorHandler("Photo  is required", 400));
-    }
-   // console.log("whatsup")
-   // console.log(req.file)
-      const base64File = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
-      "base64"
-    )}`;
-    const uploadResult = await cloudinary.uploader.upload(base64File, {
-      resource_type: "auto",
-      folder: "employeePhotos",
-    });
-  let p = "vr@123"
-  console.log("after p")
+  if (!req.file) {
+    return next(new ErrorHandler("Photo is required", 400));
+  }
+
+  const base64File = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+  const uploadResult = await cloudinary.uploader.upload(base64File, {
+    resource_type: "auto",
+    folder: "employeePhotos",
+  });
+
+  // Use admin-provided password, or default to "vr@123"
+  const finalPassword = password && password.trim().length >= 4 ? password.trim() : "vr@123";
 
   try {
     const newEmployee = await Employee.create({
       name: name,
-      password: p,
-     
+      password: finalPassword,
       phone: phone,
       role: role,
-      photoUrl:uploadResult.secure_url,
-      photoUrlPublicId:uploadResult.public_id
-    })
-
-   // console.log(newEmployee)
+      photoUrl: uploadResult.secure_url,
+      photoUrlPublicId: uploadResult.public_id
+    });
 
     return res.status(201).json({
-      message: 'Employer registration successfull',
+      message: 'Employee registration successful',
+      defaultPassword: finalPassword === "vr@123" ? "vr@123" : undefined,
       newEmployee
-    })
+    });
   } catch (error) {
     console.log(error);
-    next(error)
+    next(error);
   }
 }
 
-function parseMonthString(monthStr) {
-  if (!monthStr) return null;
+// Reset an employee's password — admin can set any new password
+export const resetEmployeePassword = async (req, res, next) => {
+  const { employeeId } = req.params;
+  const { newPassword } = req.body;
 
-  monthStr = monthStr.trim();
-
-  // case 1: YYYY-MM or YYYY/MM
-  const isoMatch = monthStr.match(/^(\d{4})[ -\/]?(\d{1,2})/);
-  if (isoMatch) {
-    const year = Number(isoMatch[1]);
-    const m = Number(isoMatch[2]);
-    if (year > 1900 && m >= 1 && m <= 12) return { year, monthIndex: m - 1 };
+  if (!newPassword || newPassword.trim().length < 4) {
+    return next(new ErrorHandler("Password must be at least 4 characters", 400));
   }
 
-  // case 2: MM-YYYY or MM/YYYY (e.g. 08-2025)
-  const revMatch = monthStr.match(/^(\d{1,2})[ -\/]?(\d{4})$/);
-  if (revMatch) {
-    const m = Number(revMatch[1]);
-    const year = Number(revMatch[2]);
-    if (year > 1900 && m >= 1 && m <= 12) return { year, monthIndex: m - 1 };
-  }
+  try {
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      return next(new ErrorHandler("Employee not found", 404));
+    }
 
-  // case 3: "August 2025" or "Aug 2025" (any case)
-  const wordsMatch = monthStr.match(/([A-Za-z]+)\s+(\d{4})/);
-  if (wordsMatch) {
-    const monthName = wordsMatch[1].toLowerCase();
-    const year = Number(wordsMatch[2]);
-    const monthNames = [
-      "january","february","march","april","may","june",
-      "july","august","september","october","november","december"
-    ];
-    const idx = monthNames.findIndex(m => m.startsWith(monthName));
-    if (idx >= 0) return { year, monthIndex: idx };
-  }
+    // Setting password triggers the pre-save bcrypt hook
+    employee.password = newPassword.trim();
+    await employee.save();
 
-  // last attempt: Date.parse on first day (may be locale-dependent)
-  const tryDate = new Date(monthStr);
-  if (!isNaN(tryDate.getTime())) {
-    return { year: tryDate.getFullYear(), monthIndex: tryDate.getMonth() };
+    return res.status(200).json({
+      message: `Password reset successfully for ${employee.name}`,
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
   }
+};
 
-  return null;
-}
+// parseMonthString helper imported from utils
 
 export const employeeAttendance = async (req, res, next) => {
   try {
@@ -2825,3 +2813,479 @@ export const getInvoice = async(req,res)=>{
 }
 
 
+// ==================== PURCHASE ====================
+
+export const createPurchase = async (req, res, next) => {
+  try {
+    const { supplierName, supplierGSTIN, items, totalAmount, purchaseDate, invoiceNo, remarks } = req.body;
+    if (!supplierName || !items || !totalAmount) {
+      return next(new ErrorHandler("Supplier name, items and total amount are required", 400));
+    }
+    const purchase = await Purchase.create({
+      supplierName, supplierGSTIN, items, totalAmount,
+      purchaseDate: purchaseDate || Date.now(),
+      invoiceNo, remarks
+    });
+    return res.status(201).json({ success: true, message: "Purchase order created", purchase });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllPurchases = async (req, res, next) => {
+  try {
+    const purchases = await Purchase.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, purchases });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPurchaseById = async (req, res, next) => {
+  try {
+    const purchase = await Purchase.findById(req.params.id);
+    if (!purchase) return next(new ErrorHandler("Purchase not found", 404));
+    return res.status(200).json({ success: true, purchase });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updatePurchaseStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const purchase = await Purchase.findById(req.params.id);
+    if (!purchase) return next(new ErrorHandler("Purchase not found", 404));
+    if (status) purchase.status = status;
+    if (status === "Received") purchase.receivedDate = new Date();
+    await purchase.save();
+    return res.status(200).json({ success: true, message: "Purchase updated", purchase });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== MATERIAL ISSUE ====================
+
+export const createMaterialIssue = async (req, res, next) => {
+  try {
+    const { productionOrder, partNo, partNoName, rawMaterialType, issuedQuantity, issuedBy, issuedByName, remarks } = req.body;
+    if (!issuedQuantity) {
+      return next(new ErrorHandler("Issued quantity is required", 400));
+    }
+    const issue = await MaterialIssue.create({
+      productionOrder, partNo, partNoName, rawMaterialType, issuedQuantity, issuedBy, issuedByName, remarks
+    });
+    return res.status(201).json({ success: true, message: "Material issued", issue });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllMaterialIssues = async (req, res, next) => {
+  try {
+    const issues = await MaterialIssue.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, issues });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateMaterialIssueStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const issue = await MaterialIssue.findById(req.params.id);
+    if (!issue) return next(new ErrorHandler("Material issue not found", 404));
+    if (status) issue.status = status;
+    await issue.save();
+    return res.status(200).json({ success: true, message: "Material issue updated", issue });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== MACHINE PRODUCTION ====================
+
+export const createMachineProduction = async (req, res, next) => {
+  try {
+    const { productionOrder, machineName, operator, operatorName, partNo, partNoName, inputQty, remarks } = req.body;
+    if (!machineName || !inputQty) {
+      return next(new ErrorHandler("Machine name and input quantity are required", 400));
+    }
+    const mp = await MachineProduction.create({
+      productionOrder, machineName, operator, operatorName, partNo, partNoName, inputQty, remarks
+    });
+    return res.status(201).json({ success: true, message: "Machine production started", machineProduction: mp });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllMachineProductions = async (req, res, next) => {
+  try {
+    const productions = await MachineProduction.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, productions });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateMachineProduction = async (req, res, next) => {
+  try {
+    const { outputQty, rejectedQty, status, endTime } = req.body;
+    const mp = await MachineProduction.findById(req.params.id);
+    if (!mp) return next(new ErrorHandler("Machine production not found", 404));
+    if (outputQty !== undefined) mp.outputQty = outputQty;
+    if (rejectedQty !== undefined) mp.rejectedQty = rejectedQty;
+    if (status) mp.status = status;
+    if (status === "Completed") mp.endTime = endTime || new Date();
+    await mp.save();
+    return res.status(200).json({ success: true, message: "Machine production updated", machineProduction: mp });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== QUALITY INSPECTION ====================
+
+export const createQualityInspection = async (req, res, next) => {
+  try {
+    const { productionOrder, machineProduction, partNo, partNoName, inspectedQty, passedQty, rejectedQty, inspectedBy, inspectedByName, defectReasons, status, remarks } = req.body;
+    if (!inspectedQty) {
+      return next(new ErrorHandler("Inspected quantity is required", 400));
+    }
+    const qc = await QualityInspection.create({
+      productionOrder, machineProduction, partNo, partNoName, inspectedQty, passedQty, rejectedQty,
+      inspectedBy, inspectedByName, defectReasons, status, remarks
+    });
+    return res.status(201).json({ success: true, message: "Quality inspection created", inspection: qc });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllQualityInspections = async (req, res, next) => {
+  try {
+    const inspections = await QualityInspection.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, inspections });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateQualityInspection = async (req, res, next) => {
+  try {
+    const { passedQty, rejectedQty, status, defectReasons, remarks } = req.body;
+    const qc = await QualityInspection.findById(req.params.id);
+    if (!qc) return next(new ErrorHandler("Inspection not found", 404));
+    if (passedQty !== undefined) qc.passedQty = passedQty;
+    if (rejectedQty !== undefined) qc.rejectedQty = rejectedQty;
+    if (status) qc.status = status;
+    if (defectReasons) qc.defectReasons = defectReasons;
+    if (remarks) qc.remarks = remarks;
+    await qc.save();
+    return res.status(200).json({ success: true, message: "Inspection updated", inspection: qc });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== FINISHED GOODS ====================
+
+export const createFinishedGoods = async (req, res, next) => {
+  try {
+    const { partNo, partNoName, quantity, batchNo, productionOrder, qualityInspection, location } = req.body;
+    if (!quantity) {
+      return next(new ErrorHandler("Quantity is required", 400));
+    }
+    const fg = await FinishedGoods.create({
+      partNo, partNoName, quantity, batchNo, productionOrder, qualityInspection, location
+    });
+    return res.status(201).json({ success: true, message: "Finished goods added", finishedGoods: fg });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllFinishedGoods = async (req, res, next) => {
+  try {
+    const goods = await FinishedGoods.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, goods });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateFinishedGoodsStatus = async (req, res, next) => {
+  try {
+    const { status, quantity } = req.body;
+    const fg = await FinishedGoods.findById(req.params.id);
+    if (!fg) return next(new ErrorHandler("Finished goods not found", 404));
+    if (status) fg.status = status;
+    if (quantity !== undefined) fg.quantity = quantity;
+    await fg.save();
+    return res.status(200).json({ success: true, message: "Finished goods updated", finishedGoods: fg });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== SALES ORDER ====================
+
+export const createSalesOrder = async (req, res, next) => {
+  try {
+    const { orderNo, customerName, customerGSTIN, customerContact, customerAddress, items, totalAmount, orderDate, expectedDeliveryDate, remarks } = req.body;
+    if (!orderNo || !customerName || !items || !totalAmount) {
+      return next(new ErrorHandler("Order no, customer name, items and total amount are required", 400));
+    }
+    const so = await SalesOrder.create({
+      orderNo, customerName, customerGSTIN, customerContact, customerAddress,
+      items, totalAmount, orderDate: orderDate || Date.now(), expectedDeliveryDate, remarks
+    });
+    return res.status(201).json({ success: true, message: "Sales order created", salesOrder: so });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllSalesOrders = async (req, res, next) => {
+  try {
+    const orders = await SalesOrder.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, orders });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSalesOrderById = async (req, res, next) => {
+  try {
+    const order = await SalesOrder.findById(req.params.id);
+    if (!order) return next(new ErrorHandler("Sales order not found", 404));
+    return res.status(200).json({ success: true, order });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateSalesOrderStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const order = await SalesOrder.findById(req.params.id);
+    if (!order) return next(new ErrorHandler("Sales order not found", 404));
+    if (status) order.status = status;
+    await order.save();
+    return res.status(200).json({ success: true, message: "Sales order updated", salesOrder: order });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== STOCK RESERVATION ====================
+
+export const createStockReservation = async (req, res, next) => {
+  try {
+    const { salesOrder, orderNo, partNo, partNoName, reservedQty, reservedBy, reservedByName, remarks } = req.body;
+    if (!salesOrder || !reservedQty) {
+      return next(new ErrorHandler("Sales order and reserved quantity are required", 400));
+    }
+    const sr = await StockReservation.create({
+      salesOrder, orderNo, partNo, partNoName, reservedQty, reservedBy, reservedByName, remarks
+    });
+    return res.status(201).json({ success: true, message: "Stock reserved", reservation: sr });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllStockReservations = async (req, res, next) => {
+  try {
+    const reservations = await StockReservation.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, reservations });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateStockReservationStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const sr = await StockReservation.findById(req.params.id);
+    if (!sr) return next(new ErrorHandler("Reservation not found", 404));
+    if (status) sr.status = status;
+    await sr.save();
+    return res.status(200).json({ success: true, message: "Reservation updated", reservation: sr });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== DISPATCH PLANNING ====================
+
+export const createDispatchPlan = async (req, res, next) => {
+  try {
+    const { salesOrder, orderNo, plannedDate, items, transporterName, vehicleNo, remarks } = req.body;
+    if (!salesOrder || !plannedDate) {
+      return next(new ErrorHandler("Sales order and planned date are required", 400));
+    }
+    const dp = await DispatchPlanning.create({
+      salesOrder, orderNo, plannedDate, items, transporterName, vehicleNo, remarks
+    });
+    return res.status(201).json({ success: true, message: "Dispatch plan created", dispatchPlan: dp });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllDispatchPlans = async (req, res, next) => {
+  try {
+    const plans = await DispatchPlanning.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, plans });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateDispatchPlanStatus = async (req, res, next) => {
+  try {
+    const { status, transporterName, vehicleNo } = req.body;
+    const dp = await DispatchPlanning.findById(req.params.id);
+    if (!dp) return next(new ErrorHandler("Dispatch plan not found", 404));
+    if (status) dp.status = status;
+    if (transporterName) dp.transporterName = transporterName;
+    if (vehicleNo) dp.vehicleNo = vehicleNo;
+    await dp.save();
+    return res.status(200).json({ success: true, message: "Dispatch plan updated", dispatchPlan: dp });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== PACKING ====================
+
+export const createPacking = async (req, res, next) => {
+  try {
+    const { dispatchPlan, salesOrder, orderNo, items, packedBy, packedByName, totalBoxes, totalWeight, remarks } = req.body;
+    if (!salesOrder) {
+      return next(new ErrorHandler("Sales order is required", 400));
+    }
+    const pack = await Packing.create({
+      dispatchPlan, salesOrder, orderNo, items, packedBy, packedByName, totalBoxes, totalWeight, remarks
+    });
+    return res.status(201).json({ success: true, message: "Packing created", packing: pack });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllPackings = async (req, res, next) => {
+  try {
+    const packings = await Packing.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, packings });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updatePackingStatus = async (req, res, next) => {
+  try {
+    const { status, totalBoxes, totalWeight } = req.body;
+    const pack = await Packing.findById(req.params.id);
+    if (!pack) return next(new ErrorHandler("Packing not found", 404));
+    if (status) pack.status = status;
+    if (totalBoxes !== undefined) pack.totalBoxes = totalBoxes;
+    if (totalWeight !== undefined) pack.totalWeight = totalWeight;
+    await pack.save();
+    return res.status(200).json({ success: true, message: "Packing updated", packing: pack });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== DISPATCH ====================
+
+export const createDispatch = async (req, res, next) => {
+  try {
+    const { salesOrder, orderNo, dispatchPlan, packing, transporterName, vehicleNo, lrNo, eWayBillNo, items, remarks } = req.body;
+    if (!salesOrder) {
+      return next(new ErrorHandler("Sales order is required", 400));
+    }
+    const dispatch = await Dispatch.create({
+      salesOrder, orderNo, dispatchPlan, packing, transporterName, vehicleNo, lrNo, eWayBillNo, items, remarks
+    });
+    return res.status(201).json({ success: true, message: "Dispatch created", dispatch });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllDispatches = async (req, res, next) => {
+  try {
+    const dispatches = await Dispatch.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, dispatches });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateDispatchStatus = async (req, res, next) => {
+  try {
+    const { status, deliveredDate } = req.body;
+    const dispatch = await Dispatch.findById(req.params.id);
+    if (!dispatch) return next(new ErrorHandler("Dispatch not found", 404));
+    if (status) dispatch.status = status;
+    if (status === "Delivered") dispatch.deliveredDate = deliveredDate || new Date();
+    await dispatch.save();
+    return res.status(200).json({ success: true, message: "Dispatch updated", dispatch });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== PAYMENT ====================
+
+export const createPayment = async (req, res, next) => {
+  try {
+    const { salesOrder, orderNo, invoice, customerName, totalAmount, paidAmount, paymentDate, paymentMode, referenceNo, remarks } = req.body;
+    if (!customerName || !totalAmount) {
+      return next(new ErrorHandler("Customer name and total amount are required", 400));
+    }
+    const balanceAmount = totalAmount - (paidAmount || 0);
+    const status = balanceAmount <= 0 ? "Paid" : (paidAmount > 0 ? "Partial" : "Pending");
+    const payment = await Payment.create({
+      salesOrder, orderNo, invoice, customerName, totalAmount, paidAmount: paidAmount || 0,
+      balanceAmount, paymentDate: paymentDate || Date.now(), paymentMode, referenceNo, status, remarks
+    });
+    return res.status(201).json({ success: true, message: "Payment recorded", payment });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllPayments = async (req, res, next) => {
+  try {
+    const payments = await Payment.find({}).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, payments });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updatePaymentStatus = async (req, res, next) => {
+  try {
+    const { paidAmount, paymentMode, referenceNo, remarks } = req.body;
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) return next(new ErrorHandler("Payment not found", 404));
+    if (paidAmount !== undefined) {
+      payment.paidAmount = paidAmount;
+      payment.balanceAmount = payment.totalAmount - paidAmount;
+      payment.status = payment.balanceAmount <= 0 ? "Paid" : (paidAmount > 0 ? "Partial" : "Pending");
+    }
+    if (paymentMode) payment.paymentMode = paymentMode;
+    if (referenceNo) payment.referenceNo = referenceNo;
+    if (remarks) payment.remarks = remarks;
+    await payment.save();
+    return res.status(200).json({ success: true, message: "Payment updated", payment });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -2,18 +2,18 @@
 import * as z from 'zod';
 
 export const sendOtpSchema = z.object({
-  email: z.email()  // ❗ FIXED: use z.string().email()
+  email: z.string().email()  // ❗ FIXED: use z.string().email()
 });
 
 export const verifyOtpRegisterSchema = z.object({
-  email: z.email(),
+  email: z.string().email(),
   otp: z.string().length(6, "OTP must be 6 digits"),
   fullName: z.string().min(1, "Full name is required"),
   password: z.string().min(6, "Password must be at least 6 characters")  // ❗ You were not using it in controller
 });
 
 export const verifyOtpLoginSchema = z.object({
-  email: z.email(),
+  email: z.string().email(),
   otp: z.string().length(6),
   adminKey: z.string().min(1, "Admin Key is required")
 });

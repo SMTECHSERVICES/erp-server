@@ -35,8 +35,19 @@ import { addInventoryProduct,
     countPcsOfPartNoCalculator,
     employeeAttendance,
     employeeProgressBar,
-    generateInvoicePdf,
- getInvoice
+    resetEmployeePassword,
+    // New Workflow Controllers
+    createPurchase, getAllPurchases, getPurchaseById, updatePurchaseStatus,
+    createMaterialIssue, getAllMaterialIssues, updateMaterialIssueStatus,
+    createMachineProduction, getAllMachineProductions, updateMachineProduction,
+    createQualityInspection, getAllQualityInspections, updateQualityInspection,
+    createFinishedGoods, getAllFinishedGoods, updateFinishedGoodsStatus,
+    createSalesOrder, getAllSalesOrders, getSalesOrderById, updateSalesOrderStatus,
+    createStockReservation, getAllStockReservations, updateStockReservationStatus,
+    createDispatchPlan, getAllDispatchPlans, updateDispatchPlanStatus,
+    createPacking, getAllPackings, updatePackingStatus,
+    createDispatch, getAllDispatches, updateDispatchStatus,
+    createPayment, getAllPayments, updatePaymentStatus
     } from '../controllers/supervisorAndAdmin.js';
 import { supervisorAndAdminMiddleware } from '../middleware/supervisorAndAdmin.js';
 import logout from '../controllers/logout.js';
@@ -87,6 +98,8 @@ router.get('/employe-tasks/:workerId',getWorkerTasks)
 router.post('/assign-employee-task/:workerId',assignTaskToWoker);
 router.put("/update-inventory/:id",updateInventoryDetail)
 
+router.patch("/reset-employee-password/:employeeId", resetEmployeePassword);
+
 router.patch("/mark-task-complete/:taskId",markTaskComplete);
 
 router.post("/create-production",createProduction);
@@ -103,8 +116,63 @@ router.get("/get-partNo-operation/:partNoId",getPartNoOperations)
 router.get('/supervisor-dashboard-Data',getSupervisorAdminData);
 router.get("/employee-attendance/:employeeId",employeeAttendance);
 router.get('/employee/get-progrees/:employeeId',employeeProgressBar);
-router.post('/invoice/pdf/generate', generateInvoicePdf);
 
+// PURCHASE ROUTES
+router.post("/purchase", createPurchase);
+router.get("/purchase", getAllPurchases);
+router.get("/purchase/:id", getPurchaseById);
+router.patch("/purchase/:id/status", updatePurchaseStatus);
+
+// MATERIAL ISSUE ROUTES
+router.post("/material-issue", createMaterialIssue);
+router.get("/material-issue", getAllMaterialIssues);
+router.patch("/material-issue/:id/status", updateMaterialIssueStatus);
+
+// MACHINE PRODUCTION ROUTES
+router.post("/machine-production", createMachineProduction);
+router.get("/machine-production", getAllMachineProductions);
+router.patch("/machine-production/:id", updateMachineProduction);
+
+// QUALITY INSPECTION ROUTES
+router.post("/quality-inspection", createQualityInspection);
+router.get("/quality-inspection", getAllQualityInspections);
+router.patch("/quality-inspection/:id", updateQualityInspection);
+
+// FINISHED GOODS ROUTES
+router.post("/finished-goods", createFinishedGoods);
+router.get("/finished-goods", getAllFinishedGoods);
+router.patch("/finished-goods/:id/status", updateFinishedGoodsStatus);
+
+// SALES ORDER ROUTES
+router.post("/sales-order", createSalesOrder);
+router.get("/sales-order", getAllSalesOrders);
+router.get("/sales-order/:id", getSalesOrderById);
+router.patch("/sales-order/:id/status", updateSalesOrderStatus);
+
+// STOCK RESERVATION ROUTES
+router.post("/stock-reservation", createStockReservation);
+router.get("/stock-reservation", getAllStockReservations);
+router.patch("/stock-reservation/:id/status", updateStockReservationStatus);
+
+// DISPATCH PLANNING ROUTES
+router.post("/dispatch-planning", createDispatchPlan);
+router.get("/dispatch-planning", getAllDispatchPlans);
+router.patch("/dispatch-planning/:id/status", updateDispatchPlanStatus);
+
+// PACKING ROUTES
+router.post("/packing", createPacking);
+router.get("/packing", getAllPackings);
+router.patch("/packing/:id/status", updatePackingStatus);
+
+// DISPATCH ROUTES
+router.post("/dispatch", createDispatch);
+router.get("/dispatch", getAllDispatches);
+router.patch("/dispatch/:id/status", updateDispatchStatus);
+
+// PAYMENT ROUTES
+router.post("/payment", createPayment);
+router.get("/payment", getAllPayments);
+router.patch("/payment/:id/status", updatePaymentStatus);
 
 // invoiceGenerator.js
 // Usage: import { generateAndSaveInvoice } from './invoiceGenerator.js';

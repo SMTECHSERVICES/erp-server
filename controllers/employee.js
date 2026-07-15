@@ -9,6 +9,7 @@ import generateToken from "../utils/generateToken.js";
 import { cookieOption } from "../constants/cookieOption.js";
 import { calculateHours } from "../utils/calculateHours.js";
 import Task from "../model/task.js";
+import { parseMonthString } from "../utils/parseMonthString.js";
 dotenv.config()
 
 
