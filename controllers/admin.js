@@ -48,8 +48,8 @@ export const sendOTP = async (req, res,next) => {
 
     res.status(200).json({ message: "OTP sent to email" });
   } catch (err) {
-    console.error(err);
-    return next(new ErrorHandler("Internal server error",500))
+    console.error("sendOTP failed:", err);
+    return next(new ErrorHandler(err.message || "Internal server error", 500));
   }
 };
 
@@ -87,8 +87,8 @@ const token = generateToken(admin._id,admin.role);
     // You can return a token or session here
     res.status(200).json({ message: "OTP verified. Login successful", admin });
   } catch (err) {
-    return next(new ErrorHandler("OTP verificaion failed"),500)
-    
+    console.error("verifyOtpRegister failed:", err);
+    return next(new ErrorHandler("OTP verification failed", 500));
   }
 };
 

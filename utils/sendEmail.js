@@ -3,9 +3,14 @@
 import nodemailer from "nodemailer";
 
 export const sendOTPEmail = async (toEmail, otp) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error("Email credentials are not configured");
+  }
+
   try {
     const transporter = nodemailer.createTransport({
       service: "gmail", // or use your custom SMTP
+      secure: true,
       auth: {
         user: process.env.EMAIL_USER, // Your email
         pass: process.env.EMAIL_PASS, // App password (not your real password)
@@ -23,6 +28,6 @@ export const sendOTPEmail = async (toEmail, otp) => {
     console.log("OTP email sent");
   } catch (error) {
     console.error("Error sending OTP email:", error);
-    throw new Error("Failed to send OTP email");
+    throw new Error(error.message || "Failed to send OTP email");
   }
 };
